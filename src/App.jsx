@@ -1,366 +1,313 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Calendar, LayoutDashboard, Users, ArrowLeftRight, Settings, 
-  ShieldCheck, Clock, Plane, ChevronRight, Search, Plus, 
-  Bell, CheckCircle2, AlertTriangle, LogIn, LogOut, Info
+  Plane, 
+  Search, 
+  MapPin, 
+  Calendar, 
+  Users, 
+  ChevronRight, 
+  ShieldCheck, 
+  Clock, 
+  CreditCard,
+  Menu,
+  X,
+  Phone,
+  Globe,
+  AlertCircle
 } from 'lucide-react';
 
-// Firebase Imports
-import { initializeApp } from 'firebase/app';
-import { 
-  getFirestore, collection, doc, onSnapshot, setDoc, 
-  updateDoc, addDoc, query
-} from 'firebase/firestore';
-import { 
-  getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut 
-} from 'firebase/auth';
+// --- Error Boundary Component ---
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("App Crash:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+          <div className="text-center p-8 bg-white rounded-2xl shadow-xl max-w-md">
+            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">Something went wrong</h1>
+            <p className="text-slate-600 mb-6">The application encountered an unexpected error. Please refresh the page.</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
-// --- Firebase Configuration ---
-const firebaseConfig = JSON.parse(__firebase_config);
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'skylink-airline-demo';
-
+// --- Main Application Component ---
 const App = () => {
-  const [user, setUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [trips, setTrips] = useState([]);
-  const [adminConfig, setAdminConfig] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('flights');
+  const [scrolled, setScrolled] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // 1. Authentication (Rule 3)
+  // Handle scroll effect for navbar
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (err) {
-        console.error("Authentication failed:", err);
-      }
-    };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, (currUser) => {
-      setUser(currUser);
-      setLoading(false);
-    });
-    return () => unsubscribe();
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // 2. Real-time Data Sync (Rule 1 & 2)
-  useEffect(() => {
-    if (!user) return;
-
-    // Listen to Public Trade Board
-    const tripsRef = collection(db, 'artifacts', appId, 'public', 'data', 'trips');
-    const unsubscribeTrips = onSnapshot(tripsRef, (snapshot) => {
-      const tripsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort in memory (Rule 2)
-      setTrips(tripsData.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
-    }, (err) => console.error("Trips sync error:", err));
-
-    // Listen to Global Airline Configuration
-    const configDoc = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'global');
-    const unsubscribeConfig = onSnapshot(configDoc, (snapshot) => {
-      if (snapshot.exists()) {
-        setAdminConfig(snapshot.data());
-      } else {
-        // Init default parameters if none exist
-        const defaultConfig = {
-          maxDutyDay: 14,
-          minRestPeriod: 10,
-          maxFlightTimeMonth: 100,
-          biddingOpen: true,
-          airlineName: "Global Airways"
-        };
-        setDoc(configDoc, defaultConfig);
-      }
-    }, (err) => console.error("Config sync error:", err));
-
-    return () => {
-      unsubscribeTrips();
-      unsubscribeConfig();
-    };
-  }, [user]);
-
-  // --- Actions ---
-
-  const postTripToBoard = async () => {
-    if (!user) return;
-    const newTrip = {
-      dep: 'JFK',
-      arr: 'LHR',
-      start: '2024-06-20 20:00',
-      end: '2024-06-21 08:30',
-      credit: '8:30',
-      status: 'Open',
-      postedBy: user.uid,
-      posterName: `Pilot ${user.uid.slice(0, 5)}`,
-      createdAt: Date.now()
-    };
-    try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'trips'), newTrip);
-    } catch (err) {
-      console.error("Could not post trip:", err);
-    }
-  };
-
-  const updateConfig = async (key, val) => {
-    if (!user) return;
-    const configDoc = doc(db, 'artifacts', appId, 'public', 'data', 'config', 'global');
-    await updateDoc(configDoc, { [key]: val });
-  };
-
-  if (loading) return (
-    <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white">
-      <Plane className="animate-spin text-blue-400 mb-4" size={40} />
-      <p className="font-bold tracking-widest animate-pulse uppercase text-sm">Establishing Secure Uplink...</p>
-    </div>
-  );
+  const destinations = [
+    { id: 1, city: 'Santorini', country: 'Greece', price: 499, img: 'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&q=80&w=800' },
+    { id: 2, city: 'Kyoto', country: 'Japan', price: 820, img: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&q=80&w=800' },
+    { id: 3, city: 'Maldives', country: 'South Asia', price: 1200, img: 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?auto=format&fit=crop&q=80&w=800' },
+  ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex font-sans text-slate-900">
-      {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 h-screen text-white flex flex-col p-6 fixed left-0 top-0 shadow-2xl z-20">
-        <div className="flex items-center gap-3 mb-12">
-          <div className="p-2 bg-blue-600 rounded-xl shadow-lg shadow-blue-500/20">
-            <Plane className="text-white h-6 w-6" />
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
+      {/* Navigation */}
+      <nav className={`fixed w-full z-50 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-md shadow-sm py-3' : 'bg-transparent py-5'}`}>
+        <div className="max-w-7xl mx-auto px-4 md:px-8 flex justify-between items-center">
+          <div className="flex items-center gap-2 group cursor-pointer">
+            <div className="bg-blue-600 p-2 rounded-lg group-hover:rotate-12 transition-transform">
+              <Plane className="text-white w-6 h-6" />
+            </div>
+            <span className={`text-2xl font-bold tracking-tight ${scrolled ? 'text-blue-900' : 'text-white'}`}>
+              SkyLink
+            </span>
           </div>
-          <span className="text-2xl font-black tracking-tighter">SkyLink</span>
-        </div>
-        
-        <nav className="flex-1 space-y-2">
-          {[
-            { id: 'dashboard', icon: LayoutDashboard, label: 'My Roster' },
-            { id: 'swaps', icon: ArrowLeftRight, label: 'Trade Board' },
-            { id: 'admin', icon: Settings, label: 'Admin Panel' }
-          ].map((item) => (
-            <button 
-              key={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`flex items-center gap-3 p-3 w-full rounded-xl transition-all font-bold text-sm ${
-                activeTab === item.id 
-                ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' 
-                : 'text-slate-500 hover:bg-slate-800 hover:text-slate-300'
-              }`}
-            >
-              <item.icon size={18}/>
-              {item.label}
-            </button>
-          ))}
-        </nav>
 
-        <div className="mt-auto pt-6 border-t border-slate-800">
-          <div className="bg-slate-800/50 p-4 rounded-2xl mb-4">
-            <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Authenticated ID</p>
-            <p className="text-xs font-mono text-blue-400 truncate">{user?.uid}</p>
+          {/* Desktop Nav */}
+          <div className={`hidden md:flex items-center gap-8 font-medium ${scrolled ? 'text-slate-600' : 'text-white/90'}`}>
+            <a href="#" className="hover:text-blue-500 transition-colors">Book</a>
+            <a href="#" className="hover:text-blue-500 transition-colors">Check-in</a>
+            <a href="#" className="hover:text-blue-500 transition-colors">Manage</a>
+            <a href="#" className="hover:text-blue-500 transition-colors">Status</a>
+            <button className="bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
+              Sign In
+            </button>
           </div>
-          <button onClick={() => signOut(auth)} className="flex items-center gap-2 text-slate-500 hover:text-white text-sm font-bold w-full transition-colors">
-            <LogOut size={16}/> Sign Out
+
+          {/* Mobile Menu Toggle */}
+          <button className="md:hidden p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            {mobileMenuOpen ? <X className={scrolled ? 'text-slate-900' : 'text-white'} /> : <Menu className={scrolled ? 'text-slate-900' : 'text-white'} />}
           </button>
         </div>
-      </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 ml-64 p-10">
-        <header className="flex justify-between items-center mb-12">
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <div className="absolute top-full left-0 w-full bg-white shadow-xl border-t border-slate-100 p-4 flex flex-col gap-4 md:hidden">
+            <a href="#" className="p-2 font-medium text-slate-700">Book</a>
+            <a href="#" className="p-2 font-medium text-slate-700">Check-in</a>
+            <a href="#" className="p-2 font-medium text-slate-700">Manage</a>
+            <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Sign In</button>
+          </div>
+        )}
+      </nav>
+
+      {/* Hero Section */}
+      <section className="relative h-[600px] flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0">
+          <img 
+            src="https://images.unsplash.com/photo-1436491865332-7a61a109c0f2?auto=format&fit=crop&q=80&w=2000" 
+            className="w-full h-full object-cover scale-105"
+            alt="Hero Background"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-900/60 to-transparent"></div>
+        </div>
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 w-full text-white">
+          <h1 className="text-5xl md:text-7xl font-extrabold mb-6 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+            Higher standards,<br />
+            <span className="text-blue-400">further horizons.</span>
+          </h1>
+          <p className="text-xl text-white/80 mb-8 max-w-xl">
+            Experience the pinnacle of air travel with SkyLink. Premium service, 
+            global connectivity, and memories that last a lifetime.
+          </p>
+
+          {/* Booking Widget */}
+          <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 text-slate-800 max-w-4xl animate-in zoom-in-95 duration-700 delay-200">
+            <div className="flex gap-4 mb-6 border-b border-slate-100 pb-4">
+              <button 
+                onClick={() => setActiveTab('flights')}
+                className={`flex items-center gap-2 font-semibold pb-2 border-b-2 transition-all ${activeTab === 'flights' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+              >
+                <Plane size={18} /> Flights
+              </button>
+              <button 
+                onClick={() => setActiveTab('hotels')}
+                className={`flex items-center gap-2 font-semibold pb-2 border-b-2 transition-all ${activeTab === 'hotels' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+              >
+                <MapPin size={18} /> Hotels
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">From</label>
+                <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-300 transition-colors">
+                  <MapPin size={18} className="text-blue-600" />
+                  <input type="text" placeholder="Origin City" className="bg-transparent outline-none w-full text-sm font-medium" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">To</label>
+                <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-300 transition-colors">
+                  <MapPin size={18} className="text-blue-600" />
+                  <input type="text" placeholder="Destination" className="bg-transparent outline-none w-full text-sm font-medium" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500 uppercase">Depart</label>
+                <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-300 transition-colors">
+                  <Calendar size={18} className="text-blue-600" />
+                  <input type="date" className="bg-transparent outline-none w-full text-sm font-medium" />
+                </div>
+              </div>
+              <div className="flex items-end">
+                <button className="w-full bg-blue-600 text-white p-3 rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30">
+                  <Search size={18} /> Search
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Featured Destinations */}
+      <section className="py-20 max-w-7xl mx-auto px-4">
+        <div className="flex justify-between items-end mb-12">
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-              {activeTab === 'dashboard' ? 'Flight Deck' : activeTab === 'swaps' ? 'Trade Board' : 'Operations'}
-            </h1>
-            <p className="text-slate-500 font-medium">
-              {adminConfig?.airlineName || 'Syncing Airline...'} Operations Portal
+            <h2 className="text-3xl font-bold text-slate-900 mb-2">Explore the World</h2>
+            <p className="text-slate-500">Curated destinations for your next escape</p>
+          </div>
+          <button className="hidden md:flex items-center gap-1 text-blue-600 font-bold hover:gap-2 transition-all">
+            View All <ChevronRight size={20} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {destinations.map((dest) => (
+            <div key={dest.id} className="group cursor-pointer">
+              <div className="relative h-80 rounded-2xl overflow-hidden mb-4">
+                <img 
+                  src={dest.img} 
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                  alt={dest.city}
+                />
+                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full font-bold text-sm shadow-sm">
+                  From ${dest.price}
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900">{dest.city}</h3>
+              <p className="text-slate-500">{dest.country}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Trust Section */}
+      <section className="bg-white py-16 border-y border-slate-100">
+        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
+          <div className="flex flex-col items-center text-center p-6 rounded-2xl hover:bg-slate-50 transition-colors">
+            <div className="bg-blue-50 p-4 rounded-full mb-4">
+              <ShieldCheck className="text-blue-600 w-8 h-8" />
+            </div>
+            <h4 className="font-bold mb-2">Safe & Secure</h4>
+            <p className="text-sm text-slate-500 leading-relaxed">Top-tier safety protocols for your peace of mind.</p>
+          </div>
+          <div className="flex flex-col items-center text-center p-6 rounded-2xl hover:bg-slate-50 transition-colors">
+            <div className="bg-green-50 p-4 rounded-full mb-4">
+              <Clock className="text-green-600 w-8 h-8" />
+            </div>
+            <h4 className="font-bold mb-2">Punctuality First</h4>
+            <p className="text-sm text-slate-500 leading-relaxed">Voted #1 for on-time arrivals in the industry.</p>
+          </div>
+          <div className="flex flex-col items-center text-center p-6 rounded-2xl hover:bg-slate-50 transition-colors">
+            <div className="bg-purple-50 p-4 rounded-full mb-4">
+              <Users className="text-purple-600 w-8 h-8" />
+            </div>
+            <h4 className="font-bold mb-2">Priority Boarding</h4>
+            <p className="text-sm text-slate-500 leading-relaxed">Save time and fly relaxed with our elite services.</p>
+          </div>
+          <div className="flex flex-col items-center text-center p-6 rounded-2xl hover:bg-slate-50 transition-colors">
+            <div className="bg-orange-50 p-4 rounded-full mb-4">
+              <CreditCard className="text-orange-600 w-8 h-8" />
+            </div>
+            <h4 className="font-bold mb-2">Flexi-Pay</h4>
+            <p className="text-sm text-slate-500 leading-relaxed">Book now, pay later with easy installment options.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-slate-900 text-white pt-20 pb-10">
+        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <Plane className="text-blue-400 w-8 h-8" />
+              <span className="text-2xl font-bold tracking-tight">SkyLink</span>
+            </div>
+            <p className="text-slate-400 text-sm leading-relaxed">
+              Redefining air travel for the modern explorer. Fly beyond your expectations with world-class hospitality.
             </p>
           </div>
-          <div className="flex gap-4">
-            <div className="bg-white px-5 py-3 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3">
-              <div className="h-2.5 w-2.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />
-              <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Live Syncing</span>
-            </div>
+          
+          <div>
+            <h5 className="font-bold mb-6 text-lg">Support</h5>
+            <ul className="space-y-4 text-slate-400 text-sm">
+              <li><a href="#" className="hover:text-blue-400 transition-colors">Help Center</a></li>
+              <li><a href="#" className="hover:text-blue-400 transition-colors">Refund Policy</a></li>
+              <li><a href="#" className="hover:text-blue-400 transition-colors">Bag Allowance</a></li>
+              <li><a href="#" className="hover:text-blue-400 transition-colors">Travel Advisory</a></li>
+            </ul>
           </div>
-        </header>
 
-        {/* Dashboard Tab */}
-        {activeTab === 'dashboard' && (
-          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm transition-transform hover:scale-[1.02]">
-                <div className="p-3 bg-blue-50 w-fit rounded-2xl text-blue-600 mb-4"><Clock size={24}/></div>
-                <h3 className="text-slate-400 text-xs font-black uppercase mb-1">Monthly Credit</h3>
-                <p className="text-4xl font-black text-slate-900">74:15</p>
-                <div className="mt-4 h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="bg-blue-600 h-full rounded-full" style={{width: '74%'}} />
-                </div>
-              </div>
-              <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm transition-transform hover:scale-[1.02]">
-                <div className="p-3 bg-orange-50 w-fit rounded-2xl text-orange-600 mb-4"><ShieldCheck size={24}/></div>
-                <h3 className="text-slate-400 text-xs font-black uppercase mb-1">Legal Rest</h3>
-                <p className="text-4xl font-black text-slate-900">{adminConfig?.minRestPeriod}h</p>
-                <p className="text-xs text-slate-500 font-bold mt-2 uppercase tracking-tighter">Current Requirement</p>
-              </div>
-              <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm transition-transform hover:scale-[1.02]">
-                <div className="p-3 bg-purple-50 w-fit rounded-2xl text-purple-600 mb-4"><Bell size={24}/></div>
-                <h3 className="text-slate-400 text-xs font-black uppercase mb-1">Trade Notifications</h3>
-                <p className="text-4xl font-black text-slate-900">3</p>
-                <p className="text-xs text-slate-500 font-bold mt-2 uppercase tracking-tighter">Pending Action</p>
-              </div>
-            </div>
+          <div>
+            <h5 className="font-bold mb-6 text-lg">Company</h5>
+            <ul className="space-y-4 text-slate-400 text-sm">
+              <li><a href="#" className="hover:text-blue-400 transition-colors">About Us</a></li>
+              <li><a href="#" className="hover:text-blue-400 transition-colors">Our Fleet</a></li>
+              <li><a href="#" className="hover:text-blue-400 transition-colors">Sustainability</a></li>
+              <li><a href="#" className="hover:text-blue-400 transition-colors">Careers</a></li>
+            </ul>
+          </div>
 
-            <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-sm">
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-xl font-black">Upcoming Duty Roster</h2>
-                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-full">JUNE 2024</span>
+          <div>
+            <h5 className="font-bold mb-6 text-lg">Contact</h5>
+            <div className="space-y-4 text-slate-400 text-sm">
+              <div className="flex items-center gap-3">
+                <Phone size={18} className="text-blue-400" />
+                <span>+1 (800) SKY-LINK</span>
               </div>
-              <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-100 rounded-[2rem] bg-slate-50/30">
-                <div className="bg-white p-6 rounded-full mb-4 shadow-sm border border-slate-100"><Calendar className="text-slate-300" size={40}/></div>
-                <p className="font-black text-slate-800 text-lg">No Active Roster Synced</p>
-                <p className="text-slate-400 text-sm max-w-xs text-center mt-2 font-medium">Your schedule will appear here once connected to the Airline CMS.</p>
+              <div className="flex items-center gap-3">
+                <Globe size={18} className="text-blue-400" />
+                <span>support@skylink.com</span>
               </div>
             </div>
           </div>
-        )}
-
-        {/* Trade Board Tab */}
-        {activeTab === 'swaps' && (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="flex justify-between items-center bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl text-white relative overflow-hidden">
-              <div className="relative z-10">
-                <h2 className="text-2xl font-black">Trade Board</h2>
-                <p className="text-slate-400 text-sm font-medium">Post trips to the collective pilot pot for swapping.</p>
-              </div>
-              <button 
-                onClick={postTripToBoard}
-                className="relative z-10 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-blue-600/40 flex items-center gap-2 transition-all active:scale-95"
-              >
-                <Plus size={20}/> Post New Trip
-              </button>
-              <div className="absolute right-[-2rem] top-[-2rem] opacity-5">
-                <Plane size={180} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
-              {trips.length === 0 ? (
-                <div className="py-20 text-center bg-white rounded-[2rem] border border-slate-100">
-                  <Info className="mx-auto text-slate-200 mb-4" size={48} />
-                  <p className="text-slate-400 font-bold italic">No active trades on the board. Be the first to post!</p>
-                </div>
-              ) : (
-                trips.map(trip => (
-                  <div key={trip.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-all hover:shadow-md">
-                    <div className="flex items-center gap-6">
-                      <div className="h-16 w-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
-                        <Plane size={32} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-3 mb-1">
-                          <span className="text-2xl font-black text-slate-900">{trip.dep}</span>
-                          <ChevronRight size={18} className="text-slate-300"/>
-                          <span className="text-2xl font-black text-slate-900">{trip.arr}</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <p className="text-xs font-bold text-slate-500 uppercase tracking-tighter">{trip.start}</p>
-                          <span className="h-1 w-1 bg-slate-200 rounded-full" />
-                          <p className="text-xs font-bold text-blue-600 uppercase tracking-tighter">Posted by {trip.posterName}</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-8">
-                      <div className="text-right">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Credit</p>
-                        <p className="text-xl font-mono font-black text-slate-800">{trip.credit}</p>
-                      </div>
-                      <button className="bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-900 px-6 py-3 rounded-xl font-black transition-all">
-                        Request
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Admin Tab */}
-        {activeTab === 'admin' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="bg-white p-10 rounded-[3rem] border border-slate-100 shadow-sm">
-              <h3 className="text-xl font-black mb-8 flex items-center gap-3">
-                <div className="p-2 bg-blue-600 rounded-lg text-white"><Settings size={20}/></div>
-                Global Duty Parameters
-              </h3>
-              
-              <div className="space-y-10">
-                <div>
-                  <div className="flex justify-between items-end mb-4">
-                    <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Max Duty Period</label>
-                    <span className="text-3xl font-black text-blue-600">{adminConfig?.maxDutyDay || 14}h</span>
-                  </div>
-                  <input 
-                    type="range" min="8" max="16" 
-                    value={adminConfig?.maxDutyDay || 14} 
-                    onChange={(e) => updateConfig('maxDutyDay', parseInt(e.target.value))}
-                    className="w-full h-3 bg-slate-100 rounded-full appearance-none cursor-pointer accent-blue-600"
-                  />
-                  <p className="mt-4 text-xs text-slate-400 font-medium leading-relaxed">
-                    Adjusting this parameter immediately enforces the limit for all pilot schedule validation and swap eligibility.
-                  </p>
-                </div>
-
-                <div>
-                  <div className="flex justify-between items-end mb-4">
-                    <label className="text-sm font-black text-slate-500 uppercase tracking-widest">Min Legal Rest</label>
-                    <span className="text-3xl font-black text-blue-600">{adminConfig?.minRestPeriod || 10}h</span>
-                  </div>
-                  <input 
-                    type="range" min="8" max="14" 
-                    value={adminConfig?.minRestPeriod || 10} 
-                    onChange={(e) => updateConfig('minRestPeriod', parseInt(e.target.value))}
-                    className="w-full h-3 bg-slate-100 rounded-full appearance-none cursor-pointer accent-blue-600"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-8">
-              <div className="bg-slate-900 text-white p-10 rounded-[3rem] shadow-2xl relative overflow-hidden">
-                <div className="relative z-10">
-                  <h3 className="text-xl font-black mb-4">Bidding Status</h3>
-                  <div className="flex items-center gap-4 p-5 bg-slate-800 rounded-3xl border border-slate-700">
-                    <div className="h-4 w-4 bg-green-500 rounded-full shadow-[0_0_12px_rgba(34,197,94,0.5)] animate-pulse" />
-                    <span className="font-black text-sm uppercase tracking-widest text-slate-200">Bidding is Active</span>
-                  </div>
-                  <button className="mt-8 w-full py-4 bg-blue-600 rounded-2xl font-black hover:bg-blue-500 transition-colors shadow-lg shadow-blue-600/20">
-                    Close Bidding Period
-                  </button>
-                </div>
-                <div className="absolute -right-10 -bottom-10 opacity-10">
-                  <Calendar size={200} />
-                </div>
-              </div>
-
-              <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-sm">
-                <h3 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4">System Alerts</h3>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-4 bg-orange-50 rounded-2xl text-orange-700 border border-orange-100">
-                    <AlertTriangle size={18}/>
-                    <p className="text-xs font-bold">3 Crew members approaching 7-day duty limit.</p>
-                  </div>
-                  <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-2xl text-blue-700 border border-blue-100">
-                    <CheckCircle2 size={18}/>
-                    <p className="text-xs font-bold">All JFK → LHR sectors for June are staffed.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </main>
+        </div>
+        
+        <div className="max-w-7xl mx-auto px-4 pt-8 border-t border-slate-800 text-center text-slate-500 text-xs">
+          © {new Date().getFullYear()} SkyLink Airways. All rights reserved. Privacy | Terms | Cookies
+        </div>
+      </footer>
     </div>
   );
 };
 
-export default App;
+// Root Export with Error Boundary Guard
+export default function SafeApp() {
+  return (
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
+  );
+}
