@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Plane, 
   Search, 
@@ -8,41 +8,41 @@ import {
   ChevronRight, 
   ShieldCheck, 
   Clock, 
-  CreditCard,
   Menu,
   X,
   Phone,
   Globe,
-  AlertCircle
+  AlertCircle,
+  Bell,
+  User,
+  Ticket
 } from 'lucide-react';
 
-// --- Error Boundary Component ---
+/**
+ * ERROR BOUNDARY
+ * Prevents "Blank White Screen" by catching JS errors during render.
+ */
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
   static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-  componentDidCatch(error, errorInfo) {
-    console.error("App Crash:", error, errorInfo);
+    return { hasError: true, error };
   }
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-          <div className="text-center p-8 bg-white rounded-2xl shadow-xl max-w-md">
-            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">Something went wrong</h1>
-            <p className="text-slate-600 mb-6">The application encountered an unexpected error. Please refresh the page.</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-            >
-              Refresh Page
-            </button>
-          </div>
+        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Application Error</h1>
+          <p className="text-slate-600 mb-6 max-w-md">The application failed to render. This is often due to a configuration error or a missing dependency in the environment.</p>
+          <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-all">
+            Reload Application
+          </button>
+          <pre className="mt-8 p-4 bg-slate-200 rounded text-xs text-left overflow-auto max-w-full">
+            {this.state.error?.toString()}
+          </pre>
         </div>
       );
     }
@@ -50,261 +50,226 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// --- Main Application Component ---
 const App = () => {
-  const [activeTab, setActiveTab] = useState('flights');
-  const [scrolled, setScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [mobileMenu, setMobileMenu] = useState(false);
+  const [searchType, setSearchType] = useState('round-trip');
 
-  // Handle scroll effect for navbar
   useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
+    const handleScroll = () => setIsScrolled(window.scrollY > 50);
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const destinations = [
-    { id: 1, city: 'Santorini', country: 'Greece', price: 499, img: 'https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?auto=format&fit=crop&q=80&w=800' },
-    { id: 2, city: 'Kyoto', country: 'Japan', price: 820, img: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&q=80&w=800' },
-    { id: 3, city: 'Maldives', country: 'South Asia', price: 1200, img: 'https://images.unsplash.com/photo-1514282401047-d79a71a590e8?auto=format&fit=crop&q=80&w=800' },
-  ];
-
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      {/* Navigation */}
-      <nav className={`fixed w-full z-50 transition-all duration-300 ${scrolled ? 'bg-white/90 backdrop-blur-md shadow-sm py-3' : 'bg-transparent py-5'}`}>
-        <div className="max-w-7xl mx-auto px-4 md:px-8 flex justify-between items-center">
-          <div className="flex items-center gap-2 group cursor-pointer">
-            <div className="bg-blue-600 p-2 rounded-lg group-hover:rotate-12 transition-transform">
-              <Plane className="text-white w-6 h-6" />
+    <div className="min-h-screen bg-[#F8FAFC]">
+      {/* --- HEADER --- */}
+      <nav className={`fixed w-full z-50 transition-all duration-500 ${isScrolled ? 'bg-white shadow-md py-3' : 'bg-transparent py-6'}`}>
+        <div className="container mx-auto px-6 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <div className="bg-blue-600 p-2 rounded-xl">
+              <Plane className="text-white w-6 h-6 rotate-45" />
             </div>
-            <span className={`text-2xl font-bold tracking-tight ${scrolled ? 'text-blue-900' : 'text-white'}`}>
-              SkyLink
+            <span className={`text-2xl font-black tracking-tighter ${isScrolled ? 'text-blue-900' : 'text-white'}`}>
+              SKYLINK
             </span>
           </div>
 
           {/* Desktop Nav */}
-          <div className={`hidden md:flex items-center gap-8 font-medium ${scrolled ? 'text-slate-600' : 'text-white/90'}`}>
-            <a href="#" className="hover:text-blue-500 transition-colors">Book</a>
-            <a href="#" className="hover:text-blue-500 transition-colors">Check-in</a>
-            <a href="#" className="hover:text-blue-500 transition-colors">Manage</a>
-            <a href="#" className="hover:text-blue-500 transition-colors">Status</a>
-            <button className="bg-blue-600 text-white px-5 py-2 rounded-full hover:bg-blue-700 transition-all shadow-lg shadow-blue-500/20">
-              Sign In
+          <div className={`hidden lg:flex items-center gap-8 font-semibold text-sm tracking-wide ${isScrolled ? 'text-slate-600' : 'text-white/90'}`}>
+            <a href="#" className="hover:text-blue-500 transition-colors">BOOK</a>
+            <a href="#" className="hover:text-blue-500 transition-colors">MANAGE</a>
+            <a href="#" className="hover:text-blue-500 transition-colors">CHECK-IN</a>
+            <a href="#" className="hover:text-blue-500 transition-colors">FLIGHT STATUS</a>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button className={`p-2 rounded-full transition-colors ${isScrolled ? 'text-slate-600 hover:bg-slate-100' : 'text-white hover:bg-white/10'}`}>
+              <Search size={20} />
+            </button>
+            <button className={`hidden md:flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all ${isScrolled ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white text-blue-900'}`}>
+              <User size={18} /> SIGN IN
+            </button>
+            <button className="lg:hidden" onClick={() => setMobileMenu(!mobileMenu)}>
+              {mobileMenu ? <X className={isScrolled ? 'text-slate-900' : 'text-white'} /> : <Menu className={isScrolled ? 'text-slate-900' : 'text-white'} />}
             </button>
           </div>
-
-          {/* Mobile Menu Toggle */}
-          <button className="md:hidden p-2" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-            {mobileMenuOpen ? <X className={scrolled ? 'text-slate-900' : 'text-white'} /> : <Menu className={scrolled ? 'text-slate-900' : 'text-white'} />}
-          </button>
         </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="absolute top-full left-0 w-full bg-white shadow-xl border-t border-slate-100 p-4 flex flex-col gap-4 md:hidden">
-            <a href="#" className="p-2 font-medium text-slate-700">Book</a>
-            <a href="#" className="p-2 font-medium text-slate-700">Check-in</a>
-            <a href="#" className="p-2 font-medium text-slate-700">Manage</a>
-            <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">Sign In</button>
-          </div>
-        )}
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative h-[600px] flex items-center justify-center overflow-hidden">
-        <div className="absolute inset-0">
+      {/* --- HERO SECTION --- */}
+      <div className="relative h-[85vh] min-h-[600px] flex items-center pt-20">
+        <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1436491865332-7a61a109c0f2?auto=format&fit=crop&q=80&w=2000" 
-            className="w-full h-full object-cover scale-105"
-            alt="Hero Background"
+            src="https://images.unsplash.com/photo-1542296332-2e4473faf563?q=80&w=2070&auto=format&fit=crop" 
+            className="w-full h-full object-cover"
+            alt="SkyLink Wings"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-900/60 to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-900/80 via-blue-900/40 to-transparent"></div>
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 w-full text-white">
-          <h1 className="text-5xl md:text-7xl font-extrabold mb-6 animate-in fade-in slide-in-from-bottom-4 duration-1000">
-            Higher standards,<br />
-            <span className="text-blue-400">further horizons.</span>
-          </h1>
-          <p className="text-xl text-white/80 mb-8 max-w-xl">
-            Experience the pinnacle of air travel with SkyLink. Premium service, 
-            global connectivity, and memories that last a lifetime.
-          </p>
-
-          {/* Booking Widget */}
-          <div className="bg-white rounded-2xl shadow-2xl p-6 md:p-8 text-slate-800 max-w-4xl animate-in zoom-in-95 duration-700 delay-200">
-            <div className="flex gap-4 mb-6 border-b border-slate-100 pb-4">
-              <button 
-                onClick={() => setActiveTab('flights')}
-                className={`flex items-center gap-2 font-semibold pb-2 border-b-2 transition-all ${activeTab === 'flights' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-              >
-                <Plane size={18} /> Flights
-              </button>
-              <button 
-                onClick={() => setActiveTab('hotels')}
-                className={`flex items-center gap-2 font-semibold pb-2 border-b-2 transition-all ${activeTab === 'hotels' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-              >
-                <MapPin size={18} /> Hotels
-              </button>
+        <div className="container mx-auto px-6 relative z-10">
+          <div className="max-w-2xl text-white">
+            <div className="inline-flex items-center gap-2 bg-blue-500/30 backdrop-blur-md px-4 py-1.5 rounded-full mb-6 border border-white/20">
+              <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
+              <span className="text-xs font-bold tracking-widest uppercase">Global Network Now Open</span>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">From</label>
-                <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-300 transition-colors">
-                  <MapPin size={18} className="text-blue-600" />
-                  <input type="text" placeholder="Origin City" className="bg-transparent outline-none w-full text-sm font-medium" />
+            <h1 className="text-6xl md:text-8xl font-black leading-none mb-6">
+              SKY IS NOT <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">THE LIMIT.</span>
+            </h1>
+            <p className="text-lg text-blue-100/80 mb-10 max-w-lg leading-relaxed">
+              Experience the new standard of premium travel. With over 150 destinations worldwide, we bring the world closer to you.
+            </p>
+            
+            {/* Quick Search Widget */}
+            <div className="bg-white rounded-3xl p-2 shadow-2xl flex flex-col md:flex-row items-stretch gap-2 max-w-3xl">
+              <div className="flex-1 flex items-center gap-3 px-4 py-3 border-r border-slate-100">
+                <MapPin className="text-blue-600" size={20} />
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Departure</span>
+                  <input type="text" placeholder="Where from?" className="text-slate-900 font-bold outline-none bg-transparent placeholder:text-slate-300" />
                 </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">To</label>
-                <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-300 transition-colors">
-                  <MapPin size={18} className="text-blue-600" />
-                  <input type="text" placeholder="Destination" className="bg-transparent outline-none w-full text-sm font-medium" />
+              <div className="flex-1 flex items-center gap-3 px-4 py-3 border-r border-slate-100">
+                <div className="bg-slate-100 p-1.5 rounded-full absolute -ml-6 hidden md:block border-4 border-white">
+                  <Plane size={14} className="text-blue-600" />
+                </div>
+                <MapPin className="text-blue-600" size={20} />
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Arrival</span>
+                  <input type="text" placeholder="Where to?" className="text-slate-900 font-bold outline-none bg-transparent placeholder:text-slate-300" />
                 </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 uppercase">Depart</label>
-                <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:border-blue-300 transition-colors">
-                  <Calendar size={18} className="text-blue-600" />
-                  <input type="date" className="bg-transparent outline-none w-full text-sm font-medium" />
-                </div>
-              </div>
-              <div className="flex items-end">
-                <button className="w-full bg-blue-600 text-white p-3 rounded-xl font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/30">
-                  <Search size={18} /> Search
-                </button>
-              </div>
+              <button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2">
+                SEARCH <ChevronRight size={18} />
+              </button>
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      {/* Featured Destinations */}
-      <section className="py-20 max-w-7xl mx-auto px-4">
+      {/* --- STATS / FEATURES --- */}
+      <div className="container mx-auto px-6 -mt-20 relative z-20">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { icon: <Clock />, title: "Real-time Tracking", desc: "Monitor your flight status with second-by-second updates." },
+            { icon: <ShieldCheck />, title: "Secure Booking", desc: "Enterprise-grade encryption for all your travel transactions." },
+            { icon: <Ticket />, title: "Easy Reschedule", desc: "Life happens. Change your plans with zero hassle via our app." }
+          ].map((item, i) => (
+            <div key={i} className="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-100 group hover:-translate-y-2 transition-all duration-300">
+              <div className="bg-blue-50 w-14 h-14 rounded-2xl flex items-center justify-center text-blue-600 mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                {item.icon}
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">{item.title}</h3>
+              <p className="text-slate-500 text-sm leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* --- DESTINATIONS --- */}
+      <section className="py-24 container mx-auto px-6">
         <div className="flex justify-between items-end mb-12">
           <div>
-            <h2 className="text-3xl font-bold text-slate-900 mb-2">Explore the World</h2>
-            <p className="text-slate-500">Curated destinations for your next escape</p>
+            <span className="text-blue-600 font-bold text-sm tracking-[0.2em] uppercase">Featured</span>
+            <h2 className="text-4xl font-black text-slate-900 mt-2">TRENDING DESTINATIONS</h2>
           </div>
-          <button className="hidden md:flex items-center gap-1 text-blue-600 font-bold hover:gap-2 transition-all">
-            View All <ChevronRight size={20} />
+          <button className="text-slate-400 hover:text-blue-600 font-bold text-sm flex items-center gap-2 transition-colors">
+            EXPLORE ALL <ChevronRight size={16} />
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {destinations.map((dest) => (
-            <div key={dest.id} className="group cursor-pointer">
-              <div className="relative h-80 rounded-2xl overflow-hidden mb-4">
-                <img 
-                  src={dest.img} 
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                  alt={dest.city}
-                />
-                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full font-bold text-sm shadow-sm">
-                  From ${dest.price}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[
+            { city: "Tokyo", price: "840", img: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=800&auto=format&fit=crop" },
+            { city: "Paris", price: "520", img: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=800&auto=format&fit=crop" },
+            { city: "New York", price: "410", img: "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=800&auto=format&fit=crop" },
+            { city: "Dubai", price: "730", img: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?q=80&w=800&auto=format&fit=crop" }
+          ].map((dest, i) => (
+            <div key={i} className="relative h-96 rounded-[2.5rem] overflow-hidden group cursor-pointer">
+              <img src={dest.img} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={dest.city} />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+              <div className="absolute bottom-0 left-0 p-8 w-full">
+                <span className="text-blue-400 font-bold text-xs tracking-widest uppercase">Starting From</span>
+                <div className="flex justify-between items-end">
+                  <h3 className="text-white text-2xl font-black">{dest.city}</h3>
+                  <span className="text-white font-bold text-xl">${dest.price}</span>
                 </div>
               </div>
-              <h3 className="text-xl font-bold text-slate-900">{dest.city}</h3>
-              <p className="text-slate-500">{dest.country}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Trust Section */}
-      <section className="bg-white py-16 border-y border-slate-100">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="flex flex-col items-center text-center p-6 rounded-2xl hover:bg-slate-50 transition-colors">
-            <div className="bg-blue-50 p-4 rounded-full mb-4">
-              <ShieldCheck className="text-blue-600 w-8 h-8" />
-            </div>
-            <h4 className="font-bold mb-2">Safe & Secure</h4>
-            <p className="text-sm text-slate-500 leading-relaxed">Top-tier safety protocols for your peace of mind.</p>
-          </div>
-          <div className="flex flex-col items-center text-center p-6 rounded-2xl hover:bg-slate-50 transition-colors">
-            <div className="bg-green-50 p-4 rounded-full mb-4">
-              <Clock className="text-green-600 w-8 h-8" />
-            </div>
-            <h4 className="font-bold mb-2">Punctuality First</h4>
-            <p className="text-sm text-slate-500 leading-relaxed">Voted #1 for on-time arrivals in the industry.</p>
-          </div>
-          <div className="flex flex-col items-center text-center p-6 rounded-2xl hover:bg-slate-50 transition-colors">
-            <div className="bg-purple-50 p-4 rounded-full mb-4">
-              <Users className="text-purple-600 w-8 h-8" />
-            </div>
-            <h4 className="font-bold mb-2">Priority Boarding</h4>
-            <p className="text-sm text-slate-500 leading-relaxed">Save time and fly relaxed with our elite services.</p>
-          </div>
-          <div className="flex flex-col items-center text-center p-6 rounded-2xl hover:bg-slate-50 transition-colors">
-            <div className="bg-orange-50 p-4 rounded-full mb-4">
-              <CreditCard className="text-orange-600 w-8 h-8" />
-            </div>
-            <h4 className="font-bold mb-2">Flexi-Pay</h4>
-            <p className="text-sm text-slate-500 leading-relaxed">Book now, pay later with easy installment options.</p>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-slate-900 text-white pt-20 pb-10">
-        <div className="max-w-7xl mx-auto px-4 grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-          <div className="space-y-6">
-            <div className="flex items-center gap-2">
-              <Plane className="text-blue-400 w-8 h-8" />
-              <span className="text-2xl font-bold tracking-tight">SkyLink</span>
-            </div>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Redefining air travel for the modern explorer. Fly beyond your expectations with world-class hospitality.
-            </p>
-          </div>
-          
-          <div>
-            <h5 className="font-bold mb-6 text-lg">Support</h5>
-            <ul className="space-y-4 text-slate-400 text-sm">
-              <li><a href="#" className="hover:text-blue-400 transition-colors">Help Center</a></li>
-              <li><a href="#" className="hover:text-blue-400 transition-colors">Refund Policy</a></li>
-              <li><a href="#" className="hover:text-blue-400 transition-colors">Bag Allowance</a></li>
-              <li><a href="#" className="hover:text-blue-400 transition-colors">Travel Advisory</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <h5 className="font-bold mb-6 text-lg">Company</h5>
-            <ul className="space-y-4 text-slate-400 text-sm">
-              <li><a href="#" className="hover:text-blue-400 transition-colors">About Us</a></li>
-              <li><a href="#" className="hover:text-blue-400 transition-colors">Our Fleet</a></li>
-              <li><a href="#" className="hover:text-blue-400 transition-colors">Sustainability</a></li>
-              <li><a href="#" className="hover:text-blue-400 transition-colors">Careers</a></li>
-            </ul>
-          </div>
-
-          <div>
-            <h5 className="font-bold mb-6 text-lg">Contact</h5>
-            <div className="space-y-4 text-slate-400 text-sm">
-              <div className="flex items-center gap-3">
-                <Phone size={18} className="text-blue-400" />
-                <span>+1 (800) SKY-LINK</span>
+      {/* --- FOOTER --- */}
+      <footer className="bg-slate-900 text-slate-400 py-20 px-6">
+        <div className="container mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+            <div className="col-span-1 md:col-span-1">
+               <div className="flex items-center gap-2 mb-6">
+                <Plane className="text-blue-500 w-6 h-6 rotate-45" />
+                <span className="text-white text-xl font-black tracking-tighter">SKYLINK</span>
               </div>
-              <div className="flex items-center gap-3">
-                <Globe size={18} className="text-blue-400" />
-                <span>support@skylink.com</span>
+              <p className="text-sm leading-relaxed mb-6">
+                Providing world-class aviation services since 1998. Your safety and comfort are our highest priorities.
+              </p>
+              <div className="flex gap-4">
+                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all cursor-pointer">
+                  <Globe size={18} />
+                </div>
+                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all cursor-pointer">
+                  <Phone size={18} />
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="text-white font-bold mb-6">SERVICES</h4>
+              <ul className="space-y-4 text-sm font-medium">
+                <li className="hover:text-blue-400 cursor-pointer transition-colors">Cargo Services</li>
+                <li className="hover:text-blue-400 cursor-pointer transition-colors">Charters</li>
+                <li className="hover:text-blue-400 cursor-pointer transition-colors">Fleet Details</li>
+                <li className="hover:text-blue-400 cursor-pointer transition-colors">In-flight Dining</li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="text-white font-bold mb-6">ABOUT</h4>
+              <ul className="space-y-4 text-sm font-medium">
+                <li className="hover:text-blue-400 cursor-pointer transition-colors">Our History</li>
+                <li className="hover:text-blue-400 cursor-pointer transition-colors">Newsroom</li>
+                <li className="hover:text-blue-400 cursor-pointer transition-colors">Sustainability</li>
+                <li className="hover:text-blue-400 cursor-pointer transition-colors">Careers</li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="text-white font-bold mb-6">NEWSLETTER</h4>
+              <p className="text-sm mb-4">Get the latest flight deals directly to your inbox.</p>
+              <div className="flex gap-2">
+                <input type="email" placeholder="Email" className="bg-slate-800 border-none rounded-xl px-4 py-2 w-full text-white text-sm outline-none focus:ring-2 focus:ring-blue-500" />
+                <button className="bg-blue-600 text-white p-2 rounded-xl">
+                  <ChevronRight size={20} />
+                </button>
               </div>
             </div>
           </div>
-        </div>
-        
-        <div className="max-w-7xl mx-auto px-4 pt-8 border-t border-slate-800 text-center text-slate-500 text-xs">
-          © {new Date().getFullYear()} SkyLink Airways. All rights reserved. Privacy | Terms | Cookies
+          <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-bold tracking-widest uppercase">
+            <span>© 2024 SKYLINK AIRWAYS GLOBAL</span>
+            <div className="flex gap-8">
+              <a href="#" className="hover:text-white">Privacy</a>
+              <a href="#" className="hover:text-white">Terms</a>
+              <a href="#" className="hover:text-white">Cookies</a>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
   );
 };
 
-// Root Export with Error Boundary Guard
-export default function SafeApp() {
+export default function Root() {
   return (
     <ErrorBoundary>
       <App />
