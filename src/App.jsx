@@ -1,278 +1,211 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Plane, 
-  Search, 
-  MapPin, 
-  Calendar, 
-  Users, 
-  ChevronRight, 
-  ShieldCheck, 
-  Clock, 
-  Menu,
-  X,
-  Phone,
-  Globe,
-  AlertCircle,
-  Bell,
-  User,
-  Ticket
-} from 'lucide-react';
-
 /**
- * ERROR BOUNDARY
- * Prevents "Blank White Screen" by catching JS errors during render.
+ * CORE LOGIC: FAA PART 117 LEGALITY ENGINE
+ * Validates FDP limits, Rest requirements, and Cumulative caps.
+ * Ref:
  */
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
+
+interface DutyPeriod {
+  reportTime: Date;
+  releaseTime: Date;
+  segments: number;
+  isAugmented: boolean;
+  flightTimeMinutes: number;
+}
+
+class LegalityEngine {
+  // Table B: Unaugmented FDP Limits (simplified for example)
+  private static getTableBLimit(reportHour: number, segments: number): number {
+    if (reportHour >= 0 && reportHour < 4) return 9;
+    if (reportHour >= 5 && reportHour < 6) return segments <= 4? 12 : 11.5;
+    if (reportHour >= 7 && reportHour < 12) return segments <= 2? 14 : 13;
+    if (reportHour >= 13 && reportHour < 17) return 12;
+    return 9; // Default conservative limit
   }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6 text-center">
-          <AlertCircle className="w-16 h-16 text-red-500 mb-4" />
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Application Error</h1>
-          <p className="text-slate-600 mb-6 max-w-md">The application failed to render. This is often due to a configuration error or a missing dependency in the environment.</p>
-          <button onClick={() => window.location.reload()} className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-all">
-            Reload Application
-          </button>
-          <pre className="mt-8 p-4 bg-slate-200 rounded text-xs text-left overflow-auto max-w-full">
-            {this.state.error?.toString()}
-          </pre>
-        </div>
-      );
+
+  static validateAssignment(pilot: any, newDuty: DutyPeriod, history: DutyPeriod): { legal: boolean; reason?: string } {
+    const reportHour = newDuty.reportTime.getHours();
+    const fdpDuration = (newDuty.releaseTime.getTime() - newDuty.reportTime.getTime()) / (1000 * 60 * 60);
+
+    // 1. Daily FDP Limit Check [4]
+    const limit = this.getTableBLimit(reportHour, newDuty.segments);
+    if (fdpDuration > limit) return { legal: false, reason: `FDP exceeds Table B limit of ${limit} hours` };
+
+    // 2. Cumulative Flight Time (100h in 28 days) [5]
+    const twentyEightDaysAgo = new Date(newDuty.reportTime.getTime() - 28 * 24 * 60 * 60 * 1000);
+    const cumulativeFlight = history
+     .filter(d => d.reportTime > twentyEightDaysAgo)
+     .reduce((sum, d) => sum + d.flightTimeMinutes, 0) + newDuty.flightTimeMinutes;
+    
+    if (cumulativeFlight > 100 * 60) return { legal: false, reason: "Exceeds 100 flight hours in 672 consecutive hours" };
+
+    // 3. Minimum Rest Check (10 hours with 8 hours sleep opportunity) [5]
+    if (history.length > 0) {
+      const lastRelease = history[history.length - 1].releaseTime;
+      const restDuration = (newDuty.reportTime.getTime() - lastRelease.getTime()) / (1000 * 60 * 60);
+      if (restDuration < 10) return { legal: false, reason: "Required 10-hour rest period not met" };
     }
-    return this.props.children;
+
+    return { legal: true };
   }
 }
 
-const App = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [mobileMenu, setMobileMenu] = useState(false);
-  const [searchType, setSearchType] = useState('round-trip');
+/**
+ * DATABASE SCHEMA (PostgreSQL / SQL)
+ * Ref:
+ */
 
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 50);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+/*
+CREATE TABLE pilots (
+  id UUID PRIMARY KEY,
+  name VARCHAR(255),
+  seniority_rank INT UNIQUE,
+  base VARCHAR(10),
+  fleet_type VARCHAR(20),
+  qualifications TEXT
+);
+
+CREATE TABLE pairings (
+  id UUID PRIMARY KEY,
+  pairing_number VARCHAR(20),
+  report_time TIMESTAMP,
+  release_time TIMESTAMP,
+  credit_minutes INT,
+  segments INT,
+  layover_city VARCHAR(10)
+);
+
+CREATE TABLE roster (
+  id UUID PRIMARY KEY,
+  pilot_id UUID REFERENCES pilots(id),
+  pairing_id UUID REFERENCES pairings(id),
+  status VARCHAR(20) -- 'AWARDED', 'TRADING', 'DROPPED'
+);
+
+CREATE TABLE trades (
+  id UUID PRIMARY KEY,
+  offering_pilot_id UUID REFERENCES pilots(id),
+  receiving_pilot_id UUID REFERENCES pilots(id),
+  offered_pairing_id UUID REFERENCES pairings(id),
+  desired_pairing_id UUID REFERENCES pairings(id),
+  status VARCHAR(20) -- 'PENDING', 'APPROVED', 'DENIED'
+);
+*/
+
+/**
+ * FRONT-END: PILOT INTERFACE (React Snippet)
+ * Ref:
+ */
+
+import React, { useState } from 'react';
+
+const PilotDashboard = () => {
+  const = useState('roster');
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
-      {/* --- HEADER --- */}
-      <nav className={`fixed w-full z-50 transition-all duration-500 ${isScrolled ? 'bg-white shadow-md py-3' : 'bg-transparent py-6'}`}>
-        <div className="container mx-auto px-6 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-2 rounded-xl">
-              <Plane className="text-white w-6 h-6 rotate-45" />
-            </div>
-            <span className={`text-2xl font-black tracking-tighter ${isScrolled ? 'text-blue-900' : 'text-white'}`}>
-              SKYLINK
-            </span>
-          </div>
-
-          {/* Desktop Nav */}
-          <div className={`hidden lg:flex items-center gap-8 font-semibold text-sm tracking-wide ${isScrolled ? 'text-slate-600' : 'text-white/90'}`}>
-            <a href="#" className="hover:text-blue-500 transition-colors">BOOK</a>
-            <a href="#" className="hover:text-blue-500 transition-colors">MANAGE</a>
-            <a href="#" className="hover:text-blue-500 transition-colors">CHECK-IN</a>
-            <a href="#" className="hover:text-blue-500 transition-colors">FLIGHT STATUS</a>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button className={`p-2 rounded-full transition-colors ${isScrolled ? 'text-slate-600 hover:bg-slate-100' : 'text-white hover:bg-white/10'}`}>
-              <Search size={20} />
-            </button>
-            <button className={`hidden md:flex items-center gap-2 px-5 py-2.5 rounded-full font-bold text-sm transition-all ${isScrolled ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'bg-white text-blue-900'}`}>
-              <User size={18} /> SIGN IN
-            </button>
-            <button className="lg:hidden" onClick={() => setMobileMenu(!mobileMenu)}>
-              {mobileMenu ? <X className={isScrolled ? 'text-slate-900' : 'text-white'} /> : <Menu className={isScrolled ? 'text-slate-900' : 'text-white'} />}
-            </button>
-          </div>
+    <div className="min-h-screen bg-gray-50 font-sans">
+      {/* Navigation Header */}
+      <nav className="bg-blue-900 text-white p-4 flex justify-between items-center shadow-lg">
+        <h1 className="text-xl font-bold tracking-tight">SkyFlow CrewConnect</h1>
+        <div className="flex gap-6">
+          <button onClick={() => setActiveTab('roster')} className={activeTab === 'roster'? 'border-b-2' : ''}>My Roster</button>
+          <button onClick={() => setActiveTab('bidding')} className={activeTab === 'bidding'? 'border-b-2' : ''}>Bid System</button>
+          <button onClick={() => setActiveTab('trades')} className={activeTab === 'trades'? 'border-b-2' : ''}>Trade Board</button>
         </div>
       </nav>
 
-      {/* --- HERO SECTION --- */}
-      <div className="relative h-[85vh] min-h-[600px] flex items-center pt-20">
-        <div className="absolute inset-0 z-0">
-          <img 
-            src="https://images.unsplash.com/photo-1542296332-2e4473faf563?q=80&w=2070&auto=format&fit=crop" 
-            className="w-full h-full object-cover"
-            alt="SkyLink Wings"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-900/80 via-blue-900/40 to-transparent"></div>
-        </div>
-
-        <div className="container mx-auto px-6 relative z-10">
-          <div className="max-w-2xl text-white">
-            <div className="inline-flex items-center gap-2 bg-blue-500/30 backdrop-blur-md px-4 py-1.5 rounded-full mb-6 border border-white/20">
-              <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
-              <span className="text-xs font-bold tracking-widest uppercase">Global Network Now Open</span>
-            </div>
-            <h1 className="text-6xl md:text-8xl font-black leading-none mb-6">
-              SKY IS NOT <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">THE LIMIT.</span>
-            </h1>
-            <p className="text-lg text-blue-100/80 mb-10 max-w-lg leading-relaxed">
-              Experience the new standard of premium travel. With over 150 destinations worldwide, we bring the world closer to you.
-            </p>
-            
-            {/* Quick Search Widget */}
-            <div className="bg-white rounded-3xl p-2 shadow-2xl flex flex-col md:flex-row items-stretch gap-2 max-w-3xl">
-              <div className="flex-1 flex items-center gap-3 px-4 py-3 border-r border-slate-100">
-                <MapPin className="text-blue-600" size={20} />
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Departure</span>
-                  <input type="text" placeholder="Where from?" className="text-slate-900 font-bold outline-none bg-transparent placeholder:text-slate-300" />
+      {/* Main Content Area */}
+      <main className="p-6 max-w-6xl mx-auto">
+        {activeTab === 'roster' && (
+          <section className="animate-fade-in">
+            <h2 className="text-2xl font-semibold mb-4 text-gray-800">Monthly Roster: April 2026</h2>
+            <div className="grid grid-cols-7 gap-2">
+              {/* Simplified Calendar Component */}
+              {[...Array(30)].map((_, i) => (
+                <div key={i} className="bg-white p-4 h-32 border rounded-lg shadow-sm hover:shadow-md transition-shadow">
+                  <span className="text-gray-400 text-sm">{i + 1}</span>
+                  {i === 12 && (
+                    <div className="mt-2 bg-blue-100 text-blue-800 p-2 rounded text-xs font-bold">
+                      FLT 402: JFK-LAX <br/> (08:00 - 14:30)
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="flex-1 flex items-center gap-3 px-4 py-3 border-r border-slate-100">
-                <div className="bg-slate-100 p-1.5 rounded-full absolute -ml-6 hidden md:block border-4 border-white">
-                  <Plane size={14} className="text-blue-600" />
-                </div>
-                <MapPin className="text-blue-600" size={20} />
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Arrival</span>
-                  <input type="text" placeholder="Where to?" className="text-slate-900 font-bold outline-none bg-transparent placeholder:text-slate-300" />
-                </div>
-              </div>
-              <button className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2">
-                SEARCH <ChevronRight size={18} />
-              </button>
+              ))}
             </div>
-          </div>
-        </div>
-      </div>
+          </section>
+        )}
 
-      {/* --- STATS / FEATURES --- */}
-      <div className="container mx-auto px-6 -mt-20 relative z-20">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[
-            { icon: <Clock />, title: "Real-time Tracking", desc: "Monitor your flight status with second-by-second updates." },
-            { icon: <ShieldCheck />, title: "Secure Booking", desc: "Enterprise-grade encryption for all your travel transactions." },
-            { icon: <Ticket />, title: "Easy Reschedule", desc: "Life happens. Change your plans with zero hassle via our app." }
-          ].map((item, i) => (
-            <div key={i} className="bg-white p-8 rounded-3xl shadow-xl shadow-slate-200/60 border border-slate-100 group hover:-translate-y-2 transition-all duration-300">
-              <div className="bg-blue-50 w-14 h-14 rounded-2xl flex items-center justify-center text-blue-600 mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                {item.icon}
-              </div>
-              <h3 className="text-xl font-bold text-slate-900 mb-2">{item.title}</h3>
-              <p className="text-slate-500 text-sm leading-relaxed">{item.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* --- DESTINATIONS --- */}
-      <section className="py-24 container mx-auto px-6">
-        <div className="flex justify-between items-end mb-12">
-          <div>
-            <span className="text-blue-600 font-bold text-sm tracking-[0.2em] uppercase">Featured</span>
-            <h2 className="text-4xl font-black text-slate-900 mt-2">TRENDING DESTINATIONS</h2>
-          </div>
-          <button className="text-slate-400 hover:text-blue-600 font-bold text-sm flex items-center gap-2 transition-colors">
-            EXPLORE ALL <ChevronRight size={16} />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            { city: "Tokyo", price: "840", img: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?q=80&w=800&auto=format&fit=crop" },
-            { city: "Paris", price: "520", img: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=800&auto=format&fit=crop" },
-            { city: "New York", price: "410", img: "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?q=80&w=800&auto=format&fit=crop" },
-            { city: "Dubai", price: "730", img: "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?q=80&w=800&auto=format&fit=crop" }
-          ].map((dest, i) => (
-            <div key={i} className="relative h-96 rounded-[2.5rem] overflow-hidden group cursor-pointer">
-              <img src={dest.img} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={dest.city} />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-              <div className="absolute bottom-0 left-0 p-8 w-full">
-                <span className="text-blue-400 font-bold text-xs tracking-widest uppercase">Starting From</span>
-                <div className="flex justify-between items-end">
-                  <h3 className="text-white text-2xl font-black">{dest.city}</h3>
-                  <span className="text-white font-bold text-xl">${dest.price}</span>
+        {activeTab === 'trades' && (
+          <section className="bg-white rounded-xl shadow p-6">
+            <h2 className="text-2xl font-semibold mb-4">Open Trade Board</h2>
+            <div className="space-y-4">
+              {/* Trade Card Example [6] */}
+              <div className="flex justify-between items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                <div>
+                  <p className="font-bold">Pairing #D3007 (JFK-MIA)</p>
+                  <p className="text-sm text-gray-500">Pilot: Capt. Sarah Miller (Seniority: 452)</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-blue-600 font-bold">Split Available</p>
+                  <button className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">Request Swap</button>
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* --- FOOTER --- */}
-      <footer className="bg-slate-900 text-slate-400 py-20 px-6">
-        <div className="container mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-            <div className="col-span-1 md:col-span-1">
-               <div className="flex items-center gap-2 mb-6">
-                <Plane className="text-blue-500 w-6 h-6 rotate-45" />
-                <span className="text-white text-xl font-black tracking-tighter">SKYLINK</span>
-              </div>
-              <p className="text-sm leading-relaxed mb-6">
-                Providing world-class aviation services since 1998. Your safety and comfort are our highest priorities.
-              </p>
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all cursor-pointer">
-                  <Globe size={18} />
-                </div>
-                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all cursor-pointer">
-                  <Phone size={18} />
-                </div>
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="text-white font-bold mb-6">SERVICES</h4>
-              <ul className="space-y-4 text-sm font-medium">
-                <li className="hover:text-blue-400 cursor-pointer transition-colors">Cargo Services</li>
-                <li className="hover:text-blue-400 cursor-pointer transition-colors">Charters</li>
-                <li className="hover:text-blue-400 cursor-pointer transition-colors">Fleet Details</li>
-                <li className="hover:text-blue-400 cursor-pointer transition-colors">In-flight Dining</li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-white font-bold mb-6">ABOUT</h4>
-              <ul className="space-y-4 text-sm font-medium">
-                <li className="hover:text-blue-400 cursor-pointer transition-colors">Our History</li>
-                <li className="hover:text-blue-400 cursor-pointer transition-colors">Newsroom</li>
-                <li className="hover:text-blue-400 cursor-pointer transition-colors">Sustainability</li>
-                <li className="hover:text-blue-400 cursor-pointer transition-colors">Careers</li>
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="text-white font-bold mb-6">NEWSLETTER</h4>
-              <p className="text-sm mb-4">Get the latest flight deals directly to your inbox.</p>
-              <div className="flex gap-2">
-                <input type="email" placeholder="Email" className="bg-slate-800 border-none rounded-xl px-4 py-2 w-full text-white text-sm outline-none focus:ring-2 focus:ring-blue-500" />
-                <button className="bg-blue-600 text-white p-2 rounded-xl">
-                  <ChevronRight size={20} />
-                </button>
-              </div>
-            </div>
-          </div>
-          <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-xs font-bold tracking-widest uppercase">
-            <span>© 2024 SKYLINK AIRWAYS GLOBAL</span>
-            <div className="flex gap-8">
-              <a href="#" className="hover:text-white">Privacy</a>
-              <a href="#" className="hover:text-white">Terms</a>
-              <a href="#" className="hover:text-white">Cookies</a>
-            </div>
-          </div>
-        </div>
-      </footer>
+          </section>
+        )}
+      </main>
     </div>
   );
 };
 
-export default function Root() {
+/**
+ * BACK-END ADMIN PANEL: SETTING OPERATIONAL PARAMETERS
+ */
+
+const AdminPanel = () => {
   return (
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
+    <div className="p-8 bg-gray-100 min-h-screen">
+      <div className="bg-white rounded-2xl p-8 shadow-xl max-w-4xl mx-auto">
+        <h2 className="text-3xl font-extrabold text-gray-900 mb-8 border-b pb-4">Airline Operations Control Center</h2>
+        
+        <div className="grid grid-cols-2 gap-8">
+          {/* Legality Config [7] */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-blue-900">Compliance & Limits</h3>
+            <div className="flex justify-between items-center">
+              <span>FAA Part 117 Rules</span>
+              <input type="checkbox" checked className="toggle-checkbox" readOnly />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600">Max Monthly Flight Credit</label>
+              <input type="number" defaultValue="85" className="w-full border p-2 rounded" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600">Default Reserve Guarantee</label>
+              <input type="number" defaultValue="75" className="w-full border p-2 rounded" />
+            </div>
+          </div>
+
+          {/* Bidding Parameters [3, 8] */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-bold text-blue-900">PBS Solver Settings</h3>
+            <div>
+              <label className="block text-sm text-gray-600">Seniority Processing Order</label>
+              <select className="w-full border p-2 rounded">
+                <option>Strict Seniority (Standard)</option>
+                <option>Weighted Fairness (Custom)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600">Denial Mode 1 Threshold</label>
+              <input type="text" defaultValue="Min Credit Value" className="w-full border p-2 rounded" />
+            </div>
+          </div>
+        </div>
+        
+        <button className="mt-8 w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700">
+          Push Roster Update to Fleet
+        </button>
+      </div>
+    </div>
   );
-}
+};
