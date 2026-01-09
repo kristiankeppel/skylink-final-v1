@@ -24,7 +24,6 @@ const appId = typeof __app_id !== 'undefined' ? __app_id : 'skylink-airline-demo
 
 const App = () => {
   const [user, setUser] = useState(null);
-  const [view, setView] = useState('pilot');
   const [activeTab, setActiveTab] = useState('dashboard');
   const [trips, setTrips] = useState([]);
   const [adminConfig, setAdminConfig] = useState(null);
@@ -118,7 +117,7 @@ const App = () => {
   if (loading) return (
     <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white">
       <Plane className="animate-spin text-blue-400 mb-4" size={40} />
-      <p className="font-bold tracking-widest animate-pulse uppercase">Establishing Secure Uplink...</p>
+      <p className="font-bold tracking-widest animate-pulse uppercase text-sm">Establishing Secure Uplink...</p>
     </div>
   );
 
@@ -159,7 +158,7 @@ const App = () => {
             <p className="text-[10px] text-slate-500 font-bold uppercase mb-1">Authenticated ID</p>
             <p className="text-xs font-mono text-blue-400 truncate">{user?.uid}</p>
           </div>
-          <button onClick={() => signOut(auth)} className="flex items-center gap-2 text-slate-500 hover:text-white text-sm font-bold">
+          <button onClick={() => signOut(auth)} className="flex items-center gap-2 text-slate-500 hover:text-white text-sm font-bold w-full transition-colors">
             <LogOut size={16}/> Sign Out
           </button>
         </div>
@@ -188,7 +187,7 @@ const App = () => {
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+              <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm transition-transform hover:scale-[1.02]">
                 <div className="p-3 bg-blue-50 w-fit rounded-2xl text-blue-600 mb-4"><Clock size={24}/></div>
                 <h3 className="text-slate-400 text-xs font-black uppercase mb-1">Monthly Credit</h3>
                 <p className="text-4xl font-black text-slate-900">74:15</p>
@@ -196,13 +195,13 @@ const App = () => {
                   <div className="bg-blue-600 h-full rounded-full" style={{width: '74%'}} />
                 </div>
               </div>
-              <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+              <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm transition-transform hover:scale-[1.02]">
                 <div className="p-3 bg-orange-50 w-fit rounded-2xl text-orange-600 mb-4"><ShieldCheck size={24}/></div>
                 <h3 className="text-slate-400 text-xs font-black uppercase mb-1">Legal Rest</h3>
                 <p className="text-4xl font-black text-slate-900">{adminConfig?.minRestPeriod}h</p>
                 <p className="text-xs text-slate-500 font-bold mt-2 uppercase tracking-tighter">Current Requirement</p>
               </div>
-              <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+              <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm transition-transform hover:scale-[1.02]">
                 <div className="p-3 bg-purple-50 w-fit rounded-2xl text-purple-600 mb-4"><Bell size={24}/></div>
                 <h3 className="text-slate-400 text-xs font-black uppercase mb-1">Trade Notifications</h3>
                 <p className="text-4xl font-black text-slate-900">3</p>
@@ -215,10 +214,10 @@ const App = () => {
                 <h2 className="text-xl font-black">Upcoming Duty Roster</h2>
                 <span className="text-xs font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-full">JUNE 2024</span>
               </div>
-              <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-100 rounded-[2rem]">
-                <div className="bg-slate-50 p-6 rounded-full mb-4"><Calendar className="text-slate-300" size={40}/></div>
+              <div className="flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-100 rounded-[2rem] bg-slate-50/30">
+                <div className="bg-white p-6 rounded-full mb-4 shadow-sm border border-slate-100"><Calendar className="text-slate-300" size={40}/></div>
                 <p className="font-black text-slate-800 text-lg">No Active Roster Synced</p>
-                <p className="text-slate-400 text-sm max-w-xs text-center mt-2">Your schedule will appear here once connected to the Airline CMS.</p>
+                <p className="text-slate-400 text-sm max-w-xs text-center mt-2 font-medium">Your schedule will appear here once connected to the Airline CMS.</p>
               </div>
             </div>
           </div>
@@ -227,17 +226,20 @@ const App = () => {
         {/* Trade Board Tab */}
         {activeTab === 'swaps' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <div className="flex justify-between items-center bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl text-white">
-              <div>
+            <div className="flex justify-between items-center bg-slate-900 p-8 rounded-[2.5rem] shadow-2xl text-white relative overflow-hidden">
+              <div className="relative z-10">
                 <h2 className="text-2xl font-black">Trade Board</h2>
-                <p className="text-slate-400 text-sm">Post trips to the collective pilot pot for swapping.</p>
+                <p className="text-slate-400 text-sm font-medium">Post trips to the collective pilot pot for swapping.</p>
               </div>
               <button 
                 onClick={postTripToBoard}
-                className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-blue-600/40 flex items-center gap-2 transition-all active:scale-95"
+                className="relative z-10 bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black shadow-lg shadow-blue-600/40 flex items-center gap-2 transition-all active:scale-95"
               >
                 <Plus size={20}/> Post New Trip
               </button>
+              <div className="absolute right-[-2rem] top-[-2rem] opacity-5">
+                <Plane size={180} />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4">
@@ -248,7 +250,7 @@ const App = () => {
                 </div>
               ) : (
                 trips.map(trip => (
-                  <div key={trip.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-all">
+                  <div key={trip.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex items-center justify-between group hover:border-blue-200 transition-all hover:shadow-md">
                     <div className="flex items-center gap-6">
                       <div className="h-16 w-16 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-500 transition-colors">
                         <Plane size={32} />
@@ -271,7 +273,7 @@ const App = () => {
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Credit</p>
                         <p className="text-xl font-mono font-black text-slate-800">{trip.credit}</p>
                       </div>
-                      <button className="bg-slate-100 hover:bg-slate-200 text-slate-900 px-6 py-3 rounded-xl font-black transition-colors">
+                      <button className="bg-slate-100 hover:bg-blue-600 hover:text-white text-slate-900 px-6 py-3 rounded-xl font-black transition-all">
                         Request
                       </button>
                     </div>
@@ -328,10 +330,10 @@ const App = () => {
                 <div className="relative z-10">
                   <h3 className="text-xl font-black mb-4">Bidding Status</h3>
                   <div className="flex items-center gap-4 p-5 bg-slate-800 rounded-3xl border border-slate-700">
-                    <div className="h-4 w-4 bg-green-500 rounded-full shadow-[0_0_12px_rgba(34,197,94,0.5)]" />
+                    <div className="h-4 w-4 bg-green-500 rounded-full shadow-[0_0_12px_rgba(34,197,94,0.5)] animate-pulse" />
                     <span className="font-black text-sm uppercase tracking-widest text-slate-200">Bidding is Active</span>
                   </div>
-                  <button className="mt-8 w-full py-4 bg-blue-600 rounded-2xl font-black hover:bg-blue-500 transition-colors">
+                  <button className="mt-8 w-full py-4 bg-blue-600 rounded-2xl font-black hover:bg-blue-500 transition-colors shadow-lg shadow-blue-600/20">
                     Close Bidding Period
                   </button>
                 </div>
